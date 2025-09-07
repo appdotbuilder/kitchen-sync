@@ -1,11 +1,12 @@
+import { db } from '../db';
+import { recipesTable, recipeIngredientsTable } from '../db/schema';
 import { type CreateRecipeInput, type Recipe } from '../schema';
 
 export const createRecipe = async (input: CreateRecipeInput): Promise<Recipe> => {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is creating a new recipe with its ingredients and persisting it in the database.
-    // This should create entries in both recipes and recipe_ingredients tables.
-    return Promise.resolve({
-        id: 0, // Placeholder ID
+  try {
+    // Create the recipe record first
+    const recipeResult = await db.insert(recipesTable)
+      .values({
         title: input.title,
         description: input.description,
         instructions: input.instructions,
@@ -15,8 +16,31 @@ export const createRecipe = async (input: CreateRecipeInput): Promise<Recipe> =>
         difficulty: input.difficulty,
         cuisine: input.cuisine,
         tags: input.tags,
-        image_url: input.image_url,
-        created_at: new Date(),
-        updated_at: new Date()
-    } as Recipe);
+        image_url: input.image_url
+      })
+      .returning()
+      .execute();
+
+    const recipe = recipeResult[0];
+
+    // Create recipe ingredient associations
+    if (input.ingredients && input.ingredients.length > 0) {
+      await db.insert(recipeIngredientsTable)
+        .values(
+          input.ingredients.map(ingredient => ({
+            recipe_id: recipe.id,
+            ingredient_id: ingredient.ingredient_id,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit,
+            notes: ingredient.notes
+          }))
+        )
+        .execute();
+    }
+
+    return recipe;
+  } catch (error) {
+    console.error('Recipe creation failed:', error);
+    throw error;
+  }
 };
